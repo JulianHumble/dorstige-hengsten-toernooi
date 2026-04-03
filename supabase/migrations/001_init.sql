@@ -23,6 +23,7 @@ CREATE TABLE beers (
   brewery varchar(200) NOT NULL,
   beer_name varchar(200) NOT NULL,
   description text NOT NULL DEFAULT '',
+  beer_type varchar(100) NOT NULL DEFAULT '',
   revealed boolean NOT NULL DEFAULT false
 );
 
@@ -45,6 +46,7 @@ CREATE TABLE guesses (
   participant_id uuid NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
   beer_id uuid NOT NULL REFERENCES beers(id) ON DELETE CASCADE,
   guessed_beer_id uuid NOT NULL REFERENCES beers(id) ON DELETE CASCADE,
+  guessed_beer_type varchar(100),
   rating int CHECK (rating >= 1 AND rating <= 10),
   is_correct boolean GENERATED ALWAYS AS (beer_id = guessed_beer_id) STORED,
   submitted_at timestamptz NOT NULL DEFAULT now(),

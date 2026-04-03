@@ -70,7 +70,6 @@ export default function RevealPage() {
     fetchData();
   }, [code]);
 
-  // Listen for session changes (back to active for next beer)
   useEffect(() => {
     if (!session) return;
 
@@ -143,6 +142,9 @@ export default function RevealPage() {
         <h1 className="text-2xl font-extrabold text-gold">{currentBeer.beer_name}</h1>
         <p className="text-cream-dark text-lg mt-1">{currentBeer.brewery}</p>
         <p className="text-cream/60 text-sm mt-2 italic">{currentBeer.description}</p>
+        <div className="mt-2 inline-block bg-gold/20 border border-gold/30 rounded-lg px-3 py-1">
+          <span className="text-gold text-sm font-semibold">{currentBeer.beer_type}</span>
+        </div>
       </div>
 
       {/* Results per participant */}
@@ -153,29 +155,49 @@ export default function RevealPage() {
             const guess = currentGuesses.find(g => g.participant_id === p.id);
             const guessedBeer = guess ? beers.find(b => b.id === guess.guessed_beer_id) : null;
             const isCorrect = guess?.is_correct;
+            const isTypeCorrect = guess?.guessed_beer_type === currentBeer.beer_type;
+            const points = (isCorrect ? 1 : 0) + (isTypeCorrect ? 1 : 0);
 
             return (
               <div
                 key={p.id}
                 className={`rounded-lg px-4 py-3 border animate-fade-in-up ${
-                  isCorrect
+                  points === 2
                     ? 'bg-green-900/30 border-green-600/40'
+                    : points === 1
+                    ? 'bg-gold/10 border-gold/30'
                     : 'bg-red-deep/20 border-red-deep/40'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{isCorrect ? '✅' : '❌'}</span>
                     <span className="text-cream font-semibold">{p.name}</span>
                   </div>
+                  <span className="text-gold font-bold text-sm">+{points} pt</span>
                 </div>
-                {guessedBeer && (
-                  <p className="text-cream/60 text-xs mt-1 ml-8">
-                    Gok: {guessedBeer.brewery} — {guessedBeer.beer_name}
-                  </p>
+                {guess && (
+                  <div className="mt-2 ml-0 space-y-1">
+                    <p className="text-sm flex items-center gap-2">
+                      <span>{isCorrect ? '✅' : '❌'}</span>
+                      <span className="text-cream/60">Bier:</span>
+                      <span className="text-cream">{guessedBeer?.brewery} — {guessedBeer?.beer_name}</span>
+                    </p>
+                    <p className="text-sm flex items-center gap-2">
+                      <span>{isTypeCorrect ? '✅' : '❌'}</span>
+                      <span className="text-cream/60">Stijl:</span>
+                      <span className="text-cream">{guess.guessed_beer_type || '—'}</span>
+                    </p>
+                    {guess.rating && (
+                      <p className="text-sm flex items-center gap-2">
+                        <span>⭐</span>
+                        <span className="text-cream/60">Cijfer:</span>
+                        <span className="text-cream font-semibold">{guess.rating}/10</span>
+                      </p>
+                    )}
+                  </div>
                 )}
                 {!guess && (
-                  <p className="text-cream/40 text-xs mt-1 ml-8 italic">Niet ingevuld</p>
+                  <p className="text-cream/40 text-xs mt-1 italic">Niet ingevuld</p>
                 )}
               </div>
             );

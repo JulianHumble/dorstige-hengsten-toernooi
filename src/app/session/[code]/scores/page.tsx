@@ -96,13 +96,16 @@ export default function ScoresPage() {
   const rankings = useMemo(() => {
     return nonHostParticipants
       .map(p => {
-        const correctGuesses = guesses.filter(
-          g => g.participant_id === p.id && g.is_correct
-        ).length;
-        return { participant: p, score: correctGuesses };
+        const playerGuesses = guesses.filter(g => g.participant_id === p.id);
+        const beerPoints = playerGuesses.filter(g => g.is_correct).length;
+        const typePoints = playerGuesses.filter(g => {
+          const beer = beers.find(b => b.id === g.beer_id);
+          return beer && g.guessed_beer_type === beer.beer_type;
+        }).length;
+        return { participant: p, score: beerPoints + typePoints, beerPoints, typePoints };
       })
       .sort((a, b) => b.score - a.score);
-  }, [nonHostParticipants, guesses]);
+  }, [nonHostParticipants, guesses, beers]);
 
   const isFinished = session?.status === 'finished';
   const winner = rankings[0];
@@ -154,7 +157,7 @@ export default function ScoresPage() {
           <p className="text-3xl font-extrabold text-gold">
             🏆 {winner.participant.name}
           </p>
-          <p className="text-cream-dark mt-1">{winner.score} van {beers.length} correct</p>
+          <p className="text-cream-dark mt-1">{winner.score} punten ({winner.beerPoints} bier + {winner.typePoints} stijl)</p>
         </div>
       )}
 
@@ -180,6 +183,9 @@ export default function ScoresPage() {
               </span>
               <div className="flex-1">
                 <p className="text-cream font-bold">{entry.participant.name}</p>
+                <p className="text-cream/40 text-xs">
+                  {entry.beerPoints} bier + {entry.typePoints} stijl
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-gold font-extrabold text-xl">{entry.score}</p>

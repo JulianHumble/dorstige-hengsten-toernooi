@@ -28,6 +28,7 @@ export default function HostSetup() {
       brewery: '',
       beer_name: '',
       description: '',
+      beer_type: 'Blond',
     }]);
   };
 
@@ -66,6 +67,7 @@ export default function HostSetup() {
         brewery: b.brewery,
         beer_name: b.beer_name,
         description: b.description,
+        beer_type: b.beer_type,
       })));
 
     if (beersError) {

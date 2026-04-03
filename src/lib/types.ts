@@ -16,6 +16,7 @@ export interface Beer {
   brewery: string;
   beer_name: string;
   description: string;
+  beer_type: string;
   revealed: boolean;
 }
 
@@ -32,8 +33,10 @@ export interface Guess {
   participant_id: string;
   beer_id: string;
   guessed_beer_id: string;
+  guessed_beer_type: string | null;
   rating: number | null;
   is_correct: boolean;
+  is_type_correct: boolean | null;
   submitted_at: string;
 }
 
@@ -57,8 +60,8 @@ export interface Database {
       };
       guesses: {
         Row: Guess;
-        Insert: Omit<Guess, 'id' | 'is_correct' | 'submitted_at'> & { id?: string; submitted_at?: string };
-        Update: Partial<Omit<Guess, 'id' | 'is_correct'>>;
+        Insert: Omit<Guess, 'id' | 'is_correct' | 'is_type_correct' | 'submitted_at'> & { id?: string; submitted_at?: string };
+        Update: Partial<Omit<Guess, 'id' | 'is_correct' | 'is_type_correct'>>;
       };
     };
     Views: Record<string, never>;

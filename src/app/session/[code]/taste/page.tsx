@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { Session, Beer, Participant, Guess } from '@/lib/types';
 import { shuffleArray } from '@/lib/utils';
+import { BEER_TYPES } from '@/lib/beers';
 import LoadingScreen from '@/components/LoadingScreen';
 
 export default function TastePage() {
@@ -19,6 +20,7 @@ export default function TastePage() {
   const [isHost, setIsHost] = useState(false);
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [selectedBeer, setSelectedBeer] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string>('');
   const [rating, setRating] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -136,6 +138,7 @@ export default function TastePage() {
   // Reset selection when beer changes
   useEffect(() => {
     setSelectedBeer(null);
+    setSelectedType('');
     setRating(null);
   }, [session?.current_beer]);
 
@@ -167,13 +170,14 @@ export default function TastePage() {
 
   const submitGuess = async () => {
     if (!selectedBeer || !currentBeer || !participantId || myGuess) return;
-    if (rating === null) return;
+    if (rating === null || !selectedType) return;
     setSubmitting(true);
 
     await supabase.from('guesses').insert({
       participant_id: participantId,
       beer_id: currentBeer.id,
       guessed_beer_id: selectedBeer,
+      guessed_beer_type: selectedType,
       rating,
     });
 
@@ -251,6 +255,23 @@ export default function TastePage() {
       {/* Guess section (non-host, not yet guessed) */}
       {!isHost && !myGuess && (
         <div className="w-full">
+          {/* Beer type dropdown */}
+          <div className="mb-5">
+            <h2 className="text-gold font-semibold mb-2 text-sm">Wat voor type bier is dit?</h2>
+            <select
+              value={selectedType}
+              onChange={e => setSelectedType(e.target.value)}
+              className="w-full bg-brown-700 border border-gold/30 text-cream rounded-lg px-4 py-3
+                focus:outline-none focus:border-gold transition-colors min-h-[48px] appearance-none"
+            >
+              <option value="" disabled>Kies een bierstijl...</option>
+              {BEER_TYPES.map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Beer guess */}
           <h2 className="text-gold font-semibold mb-3 text-sm">Welk bier is dit? Kies hieronder:</h2>
           <div className="flex flex-col gap-2">
             {shuffledBeers.map((beer) => (
@@ -302,7 +323,7 @@ export default function TastePage() {
 
           <button
             onClick={submitGuess}
-            disabled={!selectedBeer || rating === null || submitting}
+            disabled={!selectedBeer || !selectedType || rating === null || submitting}
             className="w-full mt-4 bg-gold text-brown-900 font-bold py-3 px-4 rounded-xl
               hover:bg-gold-light active:scale-95 transition-all disabled:opacity-50 min-h-[48px]"
           >
@@ -316,18 +337,26 @@ export default function TastePage() {
         <div className="w-full animate-fade-in-up">
           <div className="bg-gold/15 border-2 border-gold/50 rounded-2xl px-6 py-6 text-center">
             <div className="text-5xl mb-3">🐴</div>
-            <h2 className="text-2xl font-extrabold text-gold mb-2">Ingediend!</h2>
-            <p className="text-cream font-semibold">Jouw gok:</p>
-            <div className="bg-brown-800/50 rounded-xl px-4 py-3 mt-2">
-              <p className="text-gold font-bold">{guessedBeer?.brewery} — {guessedBeer?.beer_name}</p>
-              <p className="text-cream/50 text-sm mt-1">{guessedBeer?.description}</p>
-            </div>
-            {myGuess.rating && (
-              <div className="mt-3">
-                <p className="text-cream/60 text-sm">Jouw cijfer:</p>
-                <p className="text-3xl font-extrabold text-gold">{myGuess.rating}</p>
+            <h2 className="text-2xl font-extrabold text-gold mb-4">Ingediend!</h2>
+
+            <div className="bg-brown-800/50 rounded-xl px-4 py-4 text-left space-y-3">
+              <div>
+                <p className="text-cream/50 text-xs uppercase tracking-wider">Jouw gok</p>
+                <p className="text-gold font-bold">{guessedBeer?.brewery} — {guessedBeer?.beer_name}</p>
+                <p className="text-cream/50 text-sm mt-0.5">{guessedBeer?.description}</p>
               </div>
-            )}
+              <div className="border-t border-gold/10 pt-3 flex justify-between items-center">
+                <div>
+                  <p className="text-cream/50 text-xs uppercase tracking-wider">Bierstijl</p>
+                  <p className="text-cream font-semibold">{myGuess.guessed_beer_type}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-cream/50 text-xs uppercase tracking-wider">Cijfer</p>
+                  <p className="text-3xl font-extrabold text-gold">{myGuess.rating}</p>
+                </div>
+              </div>
+            </div>
+
             <p className="text-cream/40 text-xs mt-4">
               Wacht tot de Stalmeester het antwoord onthult...
             </p>
