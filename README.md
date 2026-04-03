@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🐴 Het Dorstige Hengsten Toernooi 2026
 
-## Getting Started
+Een realtime bierproeverij-webapp met paardenthema! Host een blinde proeverij, laat deelnemers raden welk bier ze proeven, en bekijk live wie de slimste hengst is.
 
-First, run the development server:
+## Features
+
+- **Realtime multiplayer** — deelnemers joinen via een 6-cijferige code
+- **Blinde proeverij** — deelnemers zien alleen de beschrijving, niet de naam
+- **Live updates** — zie direct wat anderen gokken via Supabase Realtime
+- **Mobile-first** — geoptimaliseerd voor gebruik op telefoon
+- **Paardenthema** — western-saloon sfeer met hoefijzer-animaties
+
+## Tech Stack
+
+- **Next.js** (App Router) + TypeScript
+- **Supabase** (Realtime + Postgres)
+- **Tailwind CSS**
+
+## Setup
+
+### 1. Supabase project aanmaken
+
+1. Ga naar [supabase.com](https://supabase.com) en maak een gratis project aan
+2. Ga naar de **SQL Editor** in je Supabase dashboard
+3. Kopieer de inhoud van `supabase/migrations/001_init.sql` en voer het uit
+4. Ga naar **Settings > API** en kopieer je Project URL en `anon` public key
+
+### 2. Environment variabelen
+
+Kopieer `.env.example` naar `.env.local`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Vul je Supabase gegevens in:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+NEXT_PUBLIC_SUPABASE_URL=https://jouw-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=jouw-anon-key
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Installeren en starten
 
-## Learn More
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open [http://localhost:3000](http://localhost:3000) in je browser.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 4. Deployen naar Vercel
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Push je code naar GitHub
+2. Importeer het project in [Vercel](https://vercel.com)
+3. Voeg de environment variabelen toe in Vercel's dashboard
+4. Deploy!
 
-## Deploy on Vercel
+## Hoe het werkt
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **Stalmeester** (host) maakt een nieuw toernooi aan met 8 vooringevulde bieren
+2. **Deelnemers** joinen via de 6-cijferige code
+3. Per bier zien deelnemers alleen de beschrijving en kiezen welk bier ze denken dat het is
+4. Na elke ronde onthult de host het juiste antwoord
+5. Aan het eind wordt de **Hengst van de Avond** gekroond! 🏆
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## De 8 standaard bieren
+
+| # | Brouwerij | Bier |
+|---|-----------|------|
+| 1 | De Moersleutel | Crank the Spring 2026 |
+| 2 | Brouwerij 't IJ | Paasij |
+| 3 | Brouwerij Kees | Mosaic Hop |
+| 4 | Pohjala | Kosmos NEIPA |
+| 5 | Brouwerij Boon | Oude Geuze Boon |
+| 6 | Jopen | Zwarte Ziel 2026 |
+| 7 | Stichting De Molen | Oester Stout |
+| 8 | De Moersleutel | Motor Oil |
