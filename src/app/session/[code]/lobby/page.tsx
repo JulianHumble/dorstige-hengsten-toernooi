@@ -108,6 +108,8 @@ export default function LobbyPage() {
       .from('sessions')
       .update({ status: 'active', current_beer: 1 })
       .eq('id', session.id);
+    // Navigate immediately for host
+    router.push(`/session/${code}/taste`);
   };
 
   if (loading) return <LoadingScreen message="De stal wordt geopend..." />;

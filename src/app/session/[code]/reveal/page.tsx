@@ -118,8 +118,10 @@ export default function RevealPage() {
     const next = (session.current_beer || 0) + 1;
     if (next > beers.length) {
       await supabase.from('sessions').update({ status: 'finished' }).eq('id', session.id);
+      router.push(`/session/${code}/scores`);
     } else {
       await supabase.from('sessions').update({ status: 'active', current_beer: next }).eq('id', session.id);
+      router.push(`/session/${code}/taste`);
     }
   };
 

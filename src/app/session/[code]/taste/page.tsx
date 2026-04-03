@@ -180,13 +180,18 @@ export default function TastePage() {
     if (rating === null || !selectedType) return;
     setSubmitting(true);
 
-    await supabase.from('guesses').insert({
+    const { data } = await supabase.from('guesses').insert({
       participant_id: participantId,
       beer_id: currentBeer.id,
       guessed_beer_id: selectedBeer,
       guessed_beer_type: selectedType,
       rating,
-    });
+    }).select().single();
+
+    // Optimistic update — don't wait for realtime
+    if (data) {
+      setGuesses(prev => [...prev, data as Guess]);
+    }
 
     setSubmitting(false);
   };
@@ -196,8 +201,11 @@ export default function TastePage() {
     const next = (session.current_beer || 0) + 1;
     if (next > beers.length) {
       await supabase.from('sessions').update({ status: 'finished' }).eq('id', session.id);
+      router.push(`/session/${code}/scores`);
     } else {
       await supabase.from('sessions').update({ current_beer: next }).eq('id', session.id);
+      // Optimistic update for host
+      setSession(prev => prev ? { ...prev, current_beer: next } : prev);
     }
   };
 
@@ -205,6 +213,8 @@ export default function TastePage() {
     if (!session || !currentBeer) return;
     await supabase.from('beers').update({ revealed: true }).eq('id', currentBeer.id);
     await supabase.from('sessions').update({ status: 'reveal' }).eq('id', session.id);
+    // Navigate immediately for host
+    router.push(`/session/${code}/reveal`);
   };
 
   if (loading) return <LoadingScreen message="De bieren worden klaargezet..." />;
