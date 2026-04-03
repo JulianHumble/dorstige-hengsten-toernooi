@@ -19,6 +19,7 @@ export default function TastePage() {
   const [isHost, setIsHost] = useState(false);
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [selectedBeer, setSelectedBeer] = useState<string | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -64,7 +65,6 @@ export default function TastePage() {
         .select('*');
 
       if (guessesData) {
-        // Filter to only guesses for beers in this session
         const beerIds = new Set(beersData?.map(b => b.id) || []);
         setGuesses(guessesData.filter(g => beerIds.has(g.beer_id)));
       }
@@ -103,7 +103,6 @@ export default function TastePage() {
         { event: 'INSERT', schema: 'public', table: 'guesses' },
         (payload) => {
           const newGuess = payload.new as Guess;
-          // Check if this guess is for a beer in this session
           const beerIds = new Set(beers.map(b => b.id));
           if (beerIds.has(newGuess.beer_id)) {
             setGuesses(prev => {
@@ -134,6 +133,12 @@ export default function TastePage() {
     };
   }, [session, beers, code, router]);
 
+  // Reset selection when beer changes
+  useEffect(() => {
+    setSelectedBeer(null);
+    setRating(null);
+  }, [session?.current_beer]);
+
   const currentBeer = useMemo(
     () => beers.find(b => b.order_number === session?.current_beer),
     [beers, session?.current_beer]
@@ -162,23 +167,23 @@ export default function TastePage() {
 
   const submitGuess = async () => {
     if (!selectedBeer || !currentBeer || !participantId || myGuess) return;
+    if (rating === null) return;
     setSubmitting(true);
 
     await supabase.from('guesses').insert({
       participant_id: participantId,
       beer_id: currentBeer.id,
       guessed_beer_id: selectedBeer,
+      rating,
     });
 
     setSubmitting(false);
-    setSelectedBeer(null);
   };
 
   const nextBeer = async () => {
     if (!session) return;
     const next = (session.current_beer || 0) + 1;
     if (next > beers.length) {
-      // All beers done
       await supabase.from('sessions').update({ status: 'finished' }).eq('id', session.id);
     } else {
       await supabase.from('sessions').update({ current_beer: next }).eq('id', session.id);
@@ -202,6 +207,8 @@ export default function TastePage() {
     );
   }
 
+  const guessedBeer = myGuess ? beers.find(b => b.id === myGuess.guessed_beer_id) : null;
+
   return (
     <div className="flex flex-col items-center min-h-screen px-4 py-6 gap-4 max-w-lg mx-auto w-full">
       {/* Header */}
@@ -210,11 +217,6 @@ export default function TastePage() {
           Bier {session.current_beer} van {beers.length}
         </p>
         <h1 className="text-2xl font-extrabold text-gold mt-1">🍺 Bier #{session.current_beer}</h1>
-      </div>
-
-      {/* Beer description (NO name/brewery) */}
-      <div className="bg-brown-700/50 border border-gold/20 rounded-xl px-5 py-4 w-full text-center">
-        <p className="text-cream italic">{currentBeer.description}</p>
       </div>
 
       {/* Host controls */}
@@ -246,31 +248,62 @@ export default function TastePage() {
         </div>
       )}
 
-      {/* Guess section (non-host) */}
+      {/* Guess section (non-host, not yet guessed) */}
       {!isHost && !myGuess && (
         <div className="w-full">
-          <h2 className="text-gold font-semibold mb-2 text-sm">Welk bier is dit?</h2>
+          <h2 className="text-gold font-semibold mb-3 text-sm">Welk bier is dit? Kies hieronder:</h2>
           <div className="flex flex-col gap-2">
             {shuffledBeers.map((beer) => (
               <button
                 key={beer.id}
                 onClick={() => setSelectedBeer(beer.id)}
-                className={`w-full text-left px-4 py-3 rounded-lg border transition-all min-h-[48px] ${
+                className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
                   selectedBeer === beer.id
-                    ? 'bg-gold/20 border-gold text-gold'
-                    : 'bg-brown-700/50 border-gold/20 text-cream hover:border-gold/40'
+                    ? 'bg-gold/20 border-gold'
+                    : 'bg-brown-700/50 border-gold/20 hover:border-gold/40'
                 }`}
               >
-                <span className="font-semibold">{beer.brewery}</span>
-                <span className="text-cream/60"> — </span>
-                <span>{beer.beer_name}</span>
+                <div className="flex items-start gap-2">
+                  <span className={`mt-0.5 text-sm ${selectedBeer === beer.id ? 'text-gold' : 'text-gold/40'}`}>
+                    {selectedBeer === beer.id ? '◉' : '○'}
+                  </span>
+                  <div className="flex-1">
+                    <p className={`font-bold ${selectedBeer === beer.id ? 'text-gold' : 'text-cream'}`}>
+                      {beer.brewery} — {beer.beer_name}
+                    </p>
+                    <p className="text-cream/50 text-sm mt-1 leading-snug">
+                      {beer.description}
+                    </p>
+                  </div>
+                </div>
               </button>
             ))}
           </div>
+
+          {/* Rating */}
+          <div className="mt-5">
+            <h2 className="text-gold font-semibold mb-2 text-sm">Geef dit bier een cijfer:</h2>
+            <div className="flex gap-1 justify-center flex-wrap">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setRating(n)}
+                  className={`w-11 h-11 rounded-lg font-bold text-lg transition-all ${
+                    rating === n
+                      ? 'bg-gold text-brown-900 scale-110'
+                      : 'bg-brown-700/50 border border-gold/20 text-cream hover:border-gold/40'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button
             onClick={submitGuess}
-            disabled={!selectedBeer || submitting}
-            className="w-full mt-3 bg-gold text-brown-900 font-bold py-3 px-4 rounded-xl
+            disabled={!selectedBeer || rating === null || submitting}
+            className="w-full mt-4 bg-gold text-brown-900 font-bold py-3 px-4 rounded-xl
               hover:bg-gold-light active:scale-95 transition-all disabled:opacity-50 min-h-[48px]"
           >
             {submitting ? '🐴 Wordt verstuurd...' : '✅ Bevestig Keuze'}
@@ -278,13 +311,27 @@ export default function TastePage() {
         </div>
       )}
 
-      {/* My guess confirmed */}
+      {/* Confirmation after submit */}
       {!isHost && myGuess && (
-        <div className="bg-gold/10 border border-gold/30 rounded-xl px-4 py-3 w-full text-center">
-          <p className="text-gold font-semibold text-sm">✅ Jouw keuze is ingediend!</p>
-          <p className="text-cream/60 text-xs mt-1">
-            {beers.find(b => b.id === myGuess.guessed_beer_id)?.brewery} — {beers.find(b => b.id === myGuess.guessed_beer_id)?.beer_name}
-          </p>
+        <div className="w-full animate-fade-in-up">
+          <div className="bg-gold/15 border-2 border-gold/50 rounded-2xl px-6 py-6 text-center">
+            <div className="text-5xl mb-3">🐴</div>
+            <h2 className="text-2xl font-extrabold text-gold mb-2">Ingediend!</h2>
+            <p className="text-cream font-semibold">Jouw gok:</p>
+            <div className="bg-brown-800/50 rounded-xl px-4 py-3 mt-2">
+              <p className="text-gold font-bold">{guessedBeer?.brewery} — {guessedBeer?.beer_name}</p>
+              <p className="text-cream/50 text-sm mt-1">{guessedBeer?.description}</p>
+            </div>
+            {myGuess.rating && (
+              <div className="mt-3">
+                <p className="text-cream/60 text-sm">Jouw cijfer:</p>
+                <p className="text-3xl font-extrabold text-gold">{myGuess.rating}</p>
+              </div>
+            )}
+            <p className="text-cream/40 text-xs mt-4">
+              Wacht tot de Stalmeester het antwoord onthult...
+            </p>
+          </div>
         </div>
       )}
 

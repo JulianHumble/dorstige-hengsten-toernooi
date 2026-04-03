@@ -45,6 +45,7 @@ CREATE TABLE guesses (
   participant_id uuid NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
   beer_id uuid NOT NULL REFERENCES beers(id) ON DELETE CASCADE,
   guessed_beer_id uuid NOT NULL REFERENCES beers(id) ON DELETE CASCADE,
+  rating int CHECK (rating >= 1 AND rating <= 10),
   is_correct boolean GENERATED ALWAYS AS (beer_id = guessed_beer_id) STORED,
   submitted_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(participant_id, beer_id)

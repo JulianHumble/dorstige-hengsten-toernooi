@@ -32,6 +32,7 @@ export interface Guess {
   participant_id: string;
   beer_id: string;
   guessed_beer_id: string;
+  rating: number | null;
   is_correct: boolean;
   submitted_at: string;
 }
