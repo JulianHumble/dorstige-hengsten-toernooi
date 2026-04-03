@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { Session, Beer, Participant, Guess } from '@/lib/types';
@@ -25,10 +25,23 @@ export default function TastePage() {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const sessionIdRef = useRef<string | null>(null);
+  const beersRef = useRef<Beer[]>([]);
+  beersRef.current = beers;
+
   useEffect(() => {
     setIsHost(localStorage.getItem('is_host') === 'true');
     setParticipantId(localStorage.getItem('participant_id'));
   }, []);
+
+  const handleSessionUpdate = useCallback((updated: Session) => {
+    setSession(updated);
+    if (updated.status === 'reveal') {
+      router.push(`/session/${code}/reveal`);
+    } else if (updated.status === 'finished') {
+      router.push(`/session/${code}/scores`);
+    }
+  }, [code, router]);
 
   // Fetch all data
   useEffect(() => {
@@ -41,6 +54,7 @@ export default function TastePage() {
 
       if (!sessionData) { setLoading(false); return; }
       setSession(sessionData);
+      sessionIdRef.current = sessionData.id;
 
       if (sessionData.status === 'finished') {
         router.push(`/session/${code}/scores`);
@@ -77,35 +91,28 @@ export default function TastePage() {
     fetchData();
   }, [code, router]);
 
-  // Realtime: session updates
+  // Realtime subscriptions — stable, only re-subscribes when session.id changes
   useEffect(() => {
-    if (!session) return;
+    if (!sessionIdRef.current) return;
+    const sid = sessionIdRef.current;
 
     const sessionChannel = supabase
-      .channel('taste-session')
+      .channel(`taste-session-${sid}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${session.id}` },
-        (payload) => {
-          const updated = payload.new as Session;
-          setSession(updated);
-          if (updated.status === 'reveal') {
-            router.push(`/session/${code}/reveal`);
-          } else if (updated.status === 'finished') {
-            router.push(`/session/${code}/scores`);
-          }
-        }
+        { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sid}` },
+        (payload) => handleSessionUpdate(payload.new as Session)
       )
       .subscribe();
 
     const guessChannel = supabase
-      .channel('taste-guesses')
+      .channel(`taste-guesses-${sid}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'guesses' },
         (payload) => {
           const newGuess = payload.new as Guess;
-          const beerIds = new Set(beers.map(b => b.id));
+          const beerIds = new Set(beersRef.current.map(b => b.id));
           if (beerIds.has(newGuess.beer_id)) {
             setGuesses(prev => {
               if (prev.find(g => g.id === newGuess.id)) return prev;
@@ -117,7 +124,7 @@ export default function TastePage() {
       .subscribe();
 
     const beerChannel = supabase
-      .channel('taste-beers')
+      .channel(`taste-beers-${sid}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'beers' },
@@ -133,7 +140,7 @@ export default function TastePage() {
       supabase.removeChannel(guessChannel);
       supabase.removeChannel(beerChannel);
     };
-  }, [session, beers, code, router]);
+  }, [session?.id, handleSessionUpdate]);
 
   // Reset selection when beer changes
   useEffect(() => {

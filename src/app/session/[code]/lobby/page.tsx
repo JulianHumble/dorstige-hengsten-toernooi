@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { Session, Participant } from '@/lib/types';
@@ -15,10 +15,20 @@ export default function LobbyPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isHost, setIsHost] = useState(false);
   const [loading, setLoading] = useState(true);
+  const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setIsHost(localStorage.getItem('is_host') === 'true');
   }, []);
+
+  const handleSessionUpdate = useCallback((updated: Session) => {
+    setSession(updated);
+    if (updated.status === 'active' || updated.status === 'reveal') {
+      router.push(`/session/${code}/taste`);
+    } else if (updated.status === 'finished') {
+      router.push(`/session/${code}/scores`);
+    }
+  }, [code, router]);
 
   // Fetch session and participants
   useEffect(() => {
@@ -31,8 +41,8 @@ export default function LobbyPage() {
 
       if (sessionData) {
         setSession(sessionData);
+        sessionIdRef.current = sessionData.id;
 
-        // If session already active, redirect to taste
         if (sessionData.status === 'active' || sessionData.status === 'reveal') {
           router.push(`/session/${code}/taste`);
           return;
@@ -56,15 +66,16 @@ export default function LobbyPage() {
     fetchData();
   }, [code, router]);
 
-  // Realtime subscriptions
+  // Realtime subscriptions — only depends on sessionIdRef being set
   useEffect(() => {
-    if (!session) return;
+    if (!sessionIdRef.current) return;
+    const sid = sessionIdRef.current;
 
     const participantChannel = supabase
-      .channel('lobby-participants')
+      .channel(`lobby-participants-${sid}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'participants', filter: `session_id=eq.${session.id}` },
+        { event: 'INSERT', schema: 'public', table: 'participants', filter: `session_id=eq.${sid}` },
         (payload) => {
           setParticipants(prev => {
             if (prev.find(p => p.id === (payload.new as Participant).id)) return prev;
@@ -75,16 +86,12 @@ export default function LobbyPage() {
       .subscribe();
 
     const sessionChannel = supabase
-      .channel('lobby-session')
+      .channel(`lobby-session-${sid}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${session.id}` },
+        { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sid}` },
         (payload) => {
-          const updated = payload.new as Session;
-          setSession(updated);
-          if (updated.status === 'active') {
-            router.push(`/session/${code}/taste`);
-          }
+          handleSessionUpdate(payload.new as Session);
         }
       )
       .subscribe();
@@ -93,7 +100,7 @@ export default function LobbyPage() {
       supabase.removeChannel(participantChannel);
       supabase.removeChannel(sessionChannel);
     };
-  }, [session, code, router]);
+  }, [session?.id, handleSessionUpdate]);
 
   const startTournament = async () => {
     if (!session) return;
@@ -122,7 +129,6 @@ export default function LobbyPage() {
         Code: <span className="font-mono font-bold text-gold text-lg">{code}</span>
       </p>
 
-      {/* Participants list */}
       <div className="w-full max-w-sm">
         <h2 className="text-gold font-semibold mb-3 text-sm">
           Hengsten in de stal ({participants.length})

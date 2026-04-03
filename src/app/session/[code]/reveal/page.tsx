@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { Session, Beer, Participant, Guess } from '@/lib/types';
@@ -19,6 +19,7 @@ export default function RevealPage() {
   const [isHost, setIsHost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showRain, setShowRain] = useState(true);
+  const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setIsHost(localStorage.getItem('is_host') === 'true');
@@ -28,6 +29,15 @@ export default function RevealPage() {
     const timer = setTimeout(() => setShowRain(false), 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleSessionUpdate = useCallback((updated: Session) => {
+    setSession(updated);
+    if (updated.status === 'active') {
+      router.push(`/session/${code}/taste`);
+    } else if (updated.status === 'finished') {
+      router.push(`/session/${code}/scores`);
+    }
+  }, [code, router]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,6 +49,7 @@ export default function RevealPage() {
 
       if (!sessionData) { setLoading(false); return; }
       setSession(sessionData);
+      sessionIdRef.current = sessionData.id;
 
       const { data: beersData } = await supabase
         .from('beers')
@@ -70,28 +81,22 @@ export default function RevealPage() {
     fetchData();
   }, [code]);
 
+  // Stable realtime subscription
   useEffect(() => {
-    if (!session) return;
+    if (!sessionIdRef.current) return;
+    const sid = sessionIdRef.current;
 
     const channel = supabase
-      .channel('reveal-session')
+      .channel(`reveal-session-${sid}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${session.id}` },
-        (payload) => {
-          const updated = payload.new as Session;
-          setSession(updated);
-          if (updated.status === 'active') {
-            router.push(`/session/${code}/taste`);
-          } else if (updated.status === 'finished') {
-            router.push(`/session/${code}/scores`);
-          }
-        }
+        { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sid}` },
+        (payload) => handleSessionUpdate(payload.new as Session)
       )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [session, code, router]);
+  }, [session?.id, handleSessionUpdate]);
 
   const currentBeer = useMemo(
     () => beers.find(b => b.order_number === session?.current_beer),
