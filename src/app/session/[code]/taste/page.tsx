@@ -8,6 +8,29 @@ import { shuffleArray } from '@/lib/utils';
 import { BEER_TYPES } from '@/lib/beers';
 import LoadingScreen from '@/components/LoadingScreen';
 
+const CHALLENGES = [
+  (name: string) => `🥃 Hengst ${name} moet een shotje doen!`,
+  (name: string) => `🍺 Hengst ${name} mag een bak uitdelen!`,
+  (name: string) => `⬇️ Hengst ${name} moet een atje doen!`,
+];
+
+// Deterministic: given a session code + total beers, pick 3 beer numbers where challenges trigger
+function getChallengeBeers(sessionCode: string, totalBeers: number): number[] {
+  let hash = 0;
+  for (let i = 0; i < sessionCode.length; i++) {
+    hash = ((hash << 5) - hash) + sessionCode.charCodeAt(i);
+    hash |= 0;
+  }
+  const candidates = Array.from({ length: totalBeers }, (_, i) => i + 1);
+  const picked: number[] = [];
+  for (let i = 0; i < 3 && candidates.length > 0; i++) {
+    const idx = Math.abs((hash + i * 7919) % candidates.length);
+    picked.push(candidates[idx]);
+    candidates.splice(idx, 1);
+  }
+  return picked;
+}
+
 export default function TastePage() {
   const params = useParams();
   const router = useRouter();
@@ -24,6 +47,7 @@ export default function TastePage() {
   const [rating, setRating] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [challenge, setChallenge] = useState<string | null>(null);
 
   const sessionIdRef = useRef<string | null>(null);
   const beersRef = useRef<Beer[]>([]);
@@ -91,7 +115,7 @@ export default function TastePage() {
     fetchData();
   }, [code, router]);
 
-  // Realtime subscriptions — stable, only re-subscribes when session.id changes
+  // Realtime subscriptions
   useEffect(() => {
     if (!sessionIdRef.current) return;
     const sid = sessionIdRef.current;
@@ -142,6 +166,30 @@ export default function TastePage() {
     };
   }, [session?.id, handleSessionUpdate]);
 
+  // Challenge logic: show challenge when current beer is a challenge beer
+  useEffect(() => {
+    if (!session?.current_beer || beers.length === 0 || participants.length === 0) {
+      setChallenge(null);
+      return;
+    }
+
+    const challengeBeers = getChallengeBeers(code, beers.length);
+    const challengeIdx = challengeBeers.indexOf(session.current_beer);
+
+    if (challengeIdx !== -1) {
+      const nonHost = participants.filter(p => !p.is_host);
+      if (nonHost.length > 0) {
+        // Deterministic random participant per challenge
+        const pIdx = Math.abs((code.charCodeAt(0) + challengeIdx * 31) % nonHost.length);
+        const victim = nonHost[pIdx];
+        const msg = CHALLENGES[challengeIdx % CHALLENGES.length](victim.name);
+        setChallenge(msg);
+      }
+    } else {
+      setChallenge(null);
+    }
+  }, [session?.current_beer, beers.length, participants, code]);
+
   // Reset selection when beer changes
   useEffect(() => {
     setSelectedBeer(null);
@@ -188,12 +236,18 @@ export default function TastePage() {
       rating,
     }).select().single();
 
-    // Optimistic update — don't wait for realtime
     if (data) {
       setGuesses(prev => [...prev, data as Guess]);
     }
 
     setSubmitting(false);
+  };
+
+  const prevBeer = async () => {
+    if (!session || !session.current_beer || session.current_beer <= 1) return;
+    const prev = session.current_beer - 1;
+    await supabase.from('sessions').update({ current_beer: prev }).eq('id', session.id);
+    setSession(s => s ? { ...s, current_beer: prev } : s);
   };
 
   const nextBeer = async () => {
@@ -204,7 +258,6 @@ export default function TastePage() {
       router.push(`/session/${code}/scores`);
     } else {
       await supabase.from('sessions').update({ current_beer: next }).eq('id', session.id);
-      // Optimistic update for host
       setSession(prev => prev ? { ...prev, current_beer: next } : prev);
     }
   };
@@ -213,7 +266,6 @@ export default function TastePage() {
     if (!session || !currentBeer) return;
     await supabase.from('beers').update({ revealed: true }).eq('id', currentBeer.id);
     await supabase.from('sessions').update({ status: 'reveal' }).eq('id', session.id);
-    // Navigate immediately for host
     router.push(`/session/${code}/reveal`);
   };
 
@@ -240,6 +292,13 @@ export default function TastePage() {
         <h1 className="text-2xl font-extrabold text-gold mt-1">🍺 Bier #{session.current_beer}</h1>
       </div>
 
+      {/* Challenge banner */}
+      {challenge && (
+        <div className="w-full bg-red-deep/30 border-2 border-red-deep rounded-xl px-4 py-4 text-center animate-fade-in-up">
+          <p className="text-2xl font-extrabold text-cream">{challenge}</p>
+        </div>
+      )}
+
       {/* Host controls */}
       {isHost && (
         <div className="flex flex-col gap-2 w-full">
@@ -259,13 +318,23 @@ export default function TastePage() {
               🏆
             </button>
           </div>
-          <button
-            onClick={nextBeer}
-            className="w-full bg-brown-700 text-cream border border-gold/30 font-bold py-3 px-4 rounded-xl
-              hover:bg-brown-600 active:scale-95 transition-all min-h-[48px]"
-          >
-            {(session.current_beer || 0) >= beers.length ? '🏁 Eindig Toernooi' : 'Volgend Bier 🍺'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={prevBeer}
+              disabled={(session.current_beer || 0) <= 1}
+              className="flex-1 bg-brown-700 text-cream border border-gold/30 font-bold py-3 px-4 rounded-xl
+                hover:bg-brown-600 active:scale-95 transition-all min-h-[48px] disabled:opacity-30"
+            >
+              ◀ Vorig Bier
+            </button>
+            <button
+              onClick={nextBeer}
+              className="flex-1 bg-brown-700 text-cream border border-gold/30 font-bold py-3 px-4 rounded-xl
+                hover:bg-brown-600 active:scale-95 transition-all min-h-[48px]"
+            >
+              {(session.current_beer || 0) >= beers.length ? '🏁 Eindig' : 'Volgend Bier 🍺'}
+            </button>
+          </div>
         </div>
       )}
 
