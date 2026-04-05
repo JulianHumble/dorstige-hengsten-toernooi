@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { Session, Participant } from '@/lib/types';
 import LoadingScreen from '@/components/LoadingScreen';
+import { useSessionPolling } from '@/lib/useSessionPolling';
 
 export default function LobbyPage() {
   const params = useParams();
@@ -65,6 +66,9 @@ export default function LobbyPage() {
 
     fetchData();
   }, [code, router]);
+
+  // Polling fallback
+  useSessionPolling(session?.id ?? null, handleSessionUpdate);
 
   // Realtime subscriptions — only depends on sessionIdRef being set
   useEffect(() => {

@@ -7,6 +7,7 @@ import type { Session, Beer, Participant, Guess } from '@/lib/types';
 import { shuffleArray } from '@/lib/utils';
 import { BEER_TYPES } from '@/lib/beers';
 import LoadingScreen from '@/components/LoadingScreen';
+import { useSessionPolling } from '@/lib/useSessionPolling';
 
 const CHALLENGES = [
   (name: string) => `🥃 Hengst ${name} moet een shotje doen!`,
@@ -114,6 +115,9 @@ export default function TastePage() {
 
     fetchData();
   }, [code, router]);
+
+  // Polling fallback for missed realtime events
+  useSessionPolling(session?.id ?? null, handleSessionUpdate);
 
   // Realtime subscriptions
   useEffect(() => {

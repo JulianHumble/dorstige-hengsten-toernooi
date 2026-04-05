@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { Session, Beer, Participant, Guess } from '@/lib/types';
 import LoadingScreen from '@/components/LoadingScreen';
+import { useSessionPolling } from '@/lib/useSessionPolling';
 import HorseshoeRain from '@/components/HorseshoeRain';
 
 export default function ScoresPage() {
@@ -74,6 +75,9 @@ export default function ScoresPage() {
 
     fetchData();
   }, [code]);
+
+  // Polling fallback
+  useSessionPolling(session?.id ?? null, handleSessionUpdate);
 
   // Stable realtime subscription
   useEffect(() => {
